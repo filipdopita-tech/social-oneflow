@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Eye, Heart, Link, Users, ChevronDown } from 'lucide-react'
+import { TrendingUp, TrendingDown, Eye, Heart, Link, Users, Radio } from 'lucide-react'
 
 const DATE_RANGES = ['7 dní', '30 dní', '90 dní', 'Vlastní']
 const PLATFORM_TABS = ['Všechny', 'Instagram', 'LinkedIn', 'TikTok', 'Facebook', 'YouTube']
@@ -85,24 +85,103 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   return null
 }
 
+interface OverviewData {
+  facebook: { insights?: { data?: unknown[] }; posts?: unknown } | null
+  instagram: { insights?: { data?: unknown[] }; media?: unknown } | null
+  youtube: { channel?: { statistics?: { subscriberCount?: string; viewCount?: string } }; videos?: unknown[] } | null
+  fetchedAt?: string
+}
+
 export default function AnalyticsPage() {
   const [dateRange, setDateRange] = useState('30 dní')
   const [platformTab, setPlatformTab] = useState('Všechny')
   const [sortCol, setSortCol] = useState('score')
+  const [isLiveData, setIsLiveData] = useState(false)
+  const [liveKpis, setLiveKpis] = useState<null | { title: string; value: string; change: number; icon: React.ComponentType<{ size: number; style?: React.CSSProperties }>; color: string }[]>(null)
 
-  const kpis = [
+  useEffect(() => {
+    fetch('/api/analytics/overview')
+      .then(r => r.json())
+      .then((data: OverviewData) => {
+        // Try to extract real metrics from API response
+        const ytSubs = data.youtube?.channel?.statistics?.subscriberCount
+        const ytViews = data.youtube?.channel?.statistics?.viewCount
+        const igInsights = data.instagram?.insights?.data
+        const fbInsights = data.facebook?.insights?.data
+
+        if (ytSubs || igInsights || fbInsights) {
+          setIsLiveData(true)
+          setLiveKpis([
+            {
+              title: 'YouTube odběratelé',
+              value: ytSubs ? parseInt(ytSubs).toLocaleString('cs') : '–',
+              change: 0,
+              icon: Eye,
+              color: '#FF4444',
+            },
+            {
+              title: 'YouTube zhlédnutí',
+              value: ytViews ? parseInt(ytViews).toLocaleString('cs') : '–',
+              change: 0,
+              icon: Users,
+              color: '#FF4444',
+            },
+            {
+              title: 'Instagram insights',
+              value: igInsights ? `${igInsights.length} metrik` : '–',
+              change: 0,
+              icon: Heart,
+              color: '#E1306C',
+            },
+            {
+              title: 'Facebook insights',
+              value: fbInsights ? `${fbInsights.length} metrik` : '–',
+              change: 0,
+              icon: Link,
+              color: '#1877F2',
+            },
+          ])
+        }
+      })
+      .catch(() => {
+        // Keep demo data on error
+      })
+
+    // Poll every 60 seconds
+    const interval = setInterval(() => {
+      fetch('/api/analytics/overview').catch(() => {})
+    }, 60000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const demoKpis = [
     { title: 'Celkový dosah', value: '312,480', change: 14.2, icon: Eye, color: '#6B5BFF' },
     { title: 'Engagement Rate', value: '4.72%', change: 8.3, icon: Heart, color: '#E1306C' },
     { title: 'Celkové imprese', value: '847,200', change: 22.1, icon: Users, color: '#00D9FF' },
     { title: 'Link kliky', value: '18,340', change: -3.4, icon: Link, color: '#00E5A0' },
   ]
 
+  const kpis = liveKpis ?? demoKpis
+
   return (
     <div className="p-8">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: '#F0F0FF' }}>Analytics Hub</h1>
+          <div className="flex items-center gap-3 mb-1">
+            <h1 className="text-2xl font-bold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>Analytics Hub</h1>
+            <span
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold"
+              style={{
+                backgroundColor: isLiveData ? 'rgba(0,229,160,0.15)' : 'rgba(255,255,255,0.06)',
+                border: `1px solid ${isLiveData ? 'rgba(0,229,160,0.4)' : 'rgba(255,255,255,0.12)'}`,
+                color: isLiveData ? '#00E5A0' : '#7B7B9A',
+              }}
+            >
+              <Radio size={10} />
+              {isLiveData ? 'Live data' : 'Demo'}
+            </span>
+          </div>
           <p className="text-sm mt-1" style={{ color: '#7B7B9A' }}>Detailní výkonnostní přehled</p>
         </div>
         <div className="flex items-center gap-3">
@@ -152,7 +231,7 @@ export default function AnalyticsPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 + i * 0.05 }}
               whileHover={{ scale: 1.02 }}
-              className="p-5 rounded-xl"
+              className="p-5 rounded-xl premium-card"
               style={{ backgroundColor: '#0F0F1A', border: '1px solid rgba(255,255,255,0.06)' }}
             >
               <div className="flex items-center justify-between mb-4">
@@ -161,7 +240,7 @@ export default function AnalyticsPage() {
                   <k.icon size={16} style={{ color: k.color }} />
                 </div>
               </div>
-              <p className="text-2xl font-bold mb-2" style={{ color: '#F0F0FF' }}>{k.value}</p>
+              <p className="text-2xl font-bold mb-2" style={{ color: '#F0F0FF', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{k.value}</p>
               <div className="flex items-center gap-1">
                 {isPos ? <TrendingUp size={13} style={{ color: '#00E5A0' }} /> : <TrendingDown size={13} style={{ color: '#FF4D6D' }} />}
                 <span className="text-xs font-medium" style={{ color: isPos ? '#00E5A0' : '#FF4D6D' }}>
@@ -184,7 +263,7 @@ export default function AnalyticsPage() {
       >
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-lg font-semibold" style={{ color: '#F0F0FF' }}>Dosah v čase</h2>
+            <h2 className="text-lg font-semibold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>Dosah v čase</h2>
             <p className="text-xs mt-0.5" style={{ color: '#7B7B9A' }}>Unikátní dosah napříč platformami</p>
           </div>
         </div>
@@ -226,7 +305,7 @@ export default function AnalyticsPage() {
           className="p-6 rounded-2xl"
           style={{ backgroundColor: '#0F0F1A', border: '1px solid rgba(255,255,255,0.06)' }}
         >
-          <h2 className="text-lg font-semibold mb-5" style={{ color: '#F0F0FF' }}>Platformy – porovnání</h2>
+          <h2 className="text-lg font-semibold mb-5" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>Platformy – porovnání</h2>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={platformBarData} barSize={28}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -246,7 +325,7 @@ export default function AnalyticsPage() {
           className="p-6 rounded-2xl"
           style={{ backgroundColor: '#0F0F1A', border: '1px solid rgba(255,255,255,0.06)' }}
         >
-          <h2 className="text-lg font-semibold mb-1" style={{ color: '#F0F0FF' }}>Nejlepší časy pro publikování</h2>
+          <h2 className="text-lg font-semibold mb-1" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>Nejlepší časy pro publikování</h2>
           <p className="text-xs mb-5" style={{ color: '#7B7B9A' }}>Tmavší = vyšší engagement</p>
           <div className="grid gap-1" style={{ gridTemplateColumns: `auto repeat(${HOURS.length}, 1fr)` }}>
             <div />
@@ -284,7 +363,7 @@ export default function AnalyticsPage() {
         className="p-6 rounded-2xl mb-8"
         style={{ backgroundColor: '#0F0F1A', border: '1px solid rgba(255,255,255,0.06)' }}
       >
-        <h2 className="text-lg font-semibold mb-5" style={{ color: '#F0F0FF' }}>Výkon obsahu</h2>
+        <h2 className="text-lg font-semibold mb-5" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>Výkon obsahu</h2>
         <table className="w-full">
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -334,13 +413,13 @@ export default function AnalyticsPage() {
 
       {/* Top Posts */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-        <h2 className="text-lg font-semibold mb-5" style={{ color: '#F0F0FF' }}>Top příspěvky</h2>
+        <h2 className="text-lg font-semibold mb-5" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>Top příspěvky</h2>
         <div className="grid grid-cols-3 gap-4">
           {topPosts.map((p, i) => (
             <motion.div
               key={i}
               whileHover={{ scale: 1.02 }}
-              className="p-5 rounded-2xl cursor-pointer"
+              className="p-5 rounded-2xl cursor-pointer premium-card"
               style={{ backgroundColor: '#0F0F1A', border: '1px solid rgba(255,255,255,0.06)' }}
             >
               <div className="flex items-center justify-between mb-3">

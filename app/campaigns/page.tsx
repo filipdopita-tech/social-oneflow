@@ -129,7 +129,7 @@ export default function CampaignsPage() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: '#F0F0FF' }}>Kampaně</h1>
+          <h1 className="text-2xl font-bold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>Kampaně</h1>
           <p className="text-sm mt-1" style={{ color: '#7B7B9A' }}>Správa a analýza obsahu kampaní</p>
         </div>
         <button
@@ -157,7 +157,7 @@ export default function CampaignsPage() {
                 transition={{ delay: i * 0.06 }}
                 whileHover={{ scale: 1.01 }}
                 onClick={() => setSelectedCampaign(c)}
-                className="p-4 rounded-2xl cursor-pointer transition-all"
+                className="p-4 rounded-2xl cursor-pointer transition-all premium-card"
                 style={{
                   backgroundColor: isSelected ? `${c.color}10` : '#0F0F1A',
                   border: `1px solid ${isSelected ? c.color + '40' : 'rgba(255,255,255,0.06)'}`,
@@ -230,7 +230,7 @@ export default function CampaignsPage() {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h2 className="text-xl font-bold" style={{ color: '#F0F0FF' }}>{selectedCampaign.name}</h2>
+                    <h2 className="text-xl font-bold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>{selectedCampaign.name}</h2>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full`} style={{ backgroundColor: statusConfig[selectedCampaign.status].bg, color: statusConfig[selectedCampaign.status].color }}>
                         {statusConfig[selectedCampaign.status].label}
@@ -263,7 +263,7 @@ export default function CampaignsPage() {
                       <p className="text-xs" style={{ color: '#7B7B9A' }}>{s.label}</p>
                       <s.icon size={14} style={{ color: s.color }} />
                     </div>
-                    <p className="text-xl font-bold" style={{ color: '#F0F0FF' }}>{s.value}</p>
+                    <p className="text-xl font-bold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{s.value}</p>
                   </div>
                 ))}
               </div>

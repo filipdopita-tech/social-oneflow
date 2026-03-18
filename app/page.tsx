@@ -56,7 +56,16 @@ export default function DashboardPage() {
         className="mb-8 flex items-start justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold mb-1" style={{ color: '#F0F0FF' }}>
+          <h1
+            className="text-4xl font-bold mb-1"
+            style={{
+              fontFamily: 'var(--font-display)',
+              background: 'linear-gradient(to right, #F0F0FF, #7B7B9A)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
+          >
             {greeting}, Filip
           </h1>
           <p className="text-sm" style={{ color: '#7B7B9A' }}>
@@ -96,8 +105,9 @@ export default function DashboardPage() {
         transition={{ delay: 0.1, duration: 0.4 }}
         className="mb-8 p-5 rounded-2xl"
         style={{
-          background: 'linear-gradient(135deg, rgba(107,91,255,0.08), rgba(0,217,255,0.05))',
-          border: '1px solid rgba(107,91,255,0.2)',
+          background: 'linear-gradient(135deg, rgba(107,91,255,0.1), rgba(0,217,255,0.04))',
+          border: '1px solid rgba(107,91,255,0.25)',
+          borderLeft: '3px solid #6B5BFF',
         }}
       >
         <div className="flex items-center gap-2 mb-3">
@@ -125,14 +135,16 @@ export default function DashboardPage() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.15, duration: 0.4 }}
-          className="col-span-3 rounded-2xl p-6 flex flex-col items-center justify-center"
+          className="col-span-3 rounded-2xl p-6 flex flex-col items-center justify-center premium-card"
           style={{
             background: 'radial-gradient(ellipse at center top, rgba(107,91,255,0.08) 0%, #0F0F1A 70%)',
             border: '1px solid rgba(255,255,255,0.06)',
           }}
         >
           <p className="text-sm font-medium mb-4" style={{ color: '#7B7B9A' }}>Content Health Score</p>
-          <CircularProgress value={87} size={140} strokeWidth={10} color="#6B5BFF" />
+          <div style={{ filter: 'drop-shadow(0 0 20px rgba(107,91,255,0.4))' }}>
+            <CircularProgress value={87} size={140} strokeWidth={10} color="#6B5BFF" />
+          </div>
           <div className="mt-4 text-center">
             <p className="text-xs font-semibold" style={{ color: '#00E5A0' }}>Excellent</p>
             <p className="text-xs mt-1" style={{ color: '#7B7B9A' }}>+5 bodů oproti minulý týden</p>
@@ -149,7 +161,7 @@ export default function DashboardPage() {
                   <div className="w-24 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
                     <div className="h-full rounded-full" style={{ width: `${m.value}%`, backgroundColor: '#6B5BFF' }} />
                   </div>
-                  <span className="text-xs font-medium" style={{ color: '#F0F0FF' }}>{m.value}</span>
+                  <span className="text-xs font-medium" style={{ color: '#F0F0FF', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{m.value}</span>
                 </div>
               </div>
             ))}
@@ -198,9 +210,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Platform Performance */}
-      <GlassCard delay={0.4} className="mb-8 p-6">
+      <GlassCard delay={0.4} className="mb-8 p-6 premium-card">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold" style={{ color: '#F0F0FF' }}>Platform Performance</h2>
+          <h2 className="text-lg font-semibold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>Platform Performance</h2>
           <button className="flex items-center gap-1 text-sm" style={{ color: '#6B5BFF' }}>
             Zobrazit vše <ArrowRight size={14} />
           </button>
@@ -213,8 +225,12 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 + i * 0.05 }}
               whileHover={{ scale: 1.03 }}
-              className="p-4 rounded-xl flex flex-col items-center text-center cursor-pointer"
-              style={{ backgroundColor: '#16162A', border: '1px solid rgba(255,255,255,0.04)' }}
+              className="p-4 rounded-xl flex flex-col items-center text-center cursor-pointer premium-card"
+              style={{
+                backgroundColor: '#16162A',
+                border: '1px solid rgba(255,255,255,0.04)',
+                transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
+              }}
             >
               <CircularProgress value={p.score} size={72} strokeWidth={6} color={p.color} showValue={true} />
               <p className="text-xs font-semibold mt-2" style={{ color: '#F0F0FF' }}>{p.name}</p>
@@ -237,10 +253,10 @@ export default function DashboardPage() {
       {/* Bottom row: Today's Queue + Activity */}
       <div className="grid grid-cols-12 gap-6">
         {/* Today's Queue */}
-        <GlassCard delay={0.5} className="col-span-7 p-6">
+        <GlassCard delay={0.5} className="col-span-7 p-6 premium-card">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="text-lg font-semibold" style={{ color: '#F0F0FF' }}>Dnešní fronta</h2>
+              <h2 className="text-lg font-semibold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>Dnešní fronta</h2>
               <p className="text-xs mt-0.5" style={{ color: '#7B7B9A' }}>5 příspěvků naplánováno na dnes</p>
             </div>
             <button className="flex items-center gap-1 text-sm" style={{ color: '#6B5BFF' }}>
@@ -279,10 +295,10 @@ export default function DashboardPage() {
         </GlassCard>
 
         {/* Recent Activity */}
-        <GlassCard delay={0.55} className="col-span-5 p-6">
+        <GlassCard delay={0.55} className="col-span-5 p-6 premium-card">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="text-lg font-semibold" style={{ color: '#F0F0FF' }}>Nedávná aktivita</h2>
+              <h2 className="text-lg font-semibold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>Nedávná aktivita</h2>
               <p className="text-xs mt-0.5" style={{ color: '#7B7B9A' }}>Co se děje v týmu</p>
             </div>
             <Activity size={16} style={{ color: '#7B7B9A' }} />

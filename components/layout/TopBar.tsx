@@ -2,21 +2,50 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Search, Bell, Sparkles, ChevronDown, Instagram, Linkedin, Youtube, Facebook } from 'lucide-react'
+import { Search, Bell, Sparkles, ChevronDown } from 'lucide-react'
 
-const platforms = [
-  { id: 'ig', label: 'IG', connected: true },
-  { id: 'li', label: 'LI', connected: true },
-  { id: 'tt', label: 'TT', connected: true },
-  { id: 'fb', label: 'FB', connected: true },
-  { id: 'yt', label: 'YT', connected: false },
+interface PlatformStatus {
+  facebook: boolean
+  instagram: boolean
+  linkedin: boolean
+  youtube: boolean
+  tiktok: boolean
+  pinterest: boolean
+}
+
+const DEFAULT_STATUS: PlatformStatus = {
+  facebook: false,
+  instagram: false,
+  linkedin: false,
+  youtube: false,
+  tiktok: false,
+  pinterest: false,
+}
+
+const PLATFORM_PILLS = [
+  { id: 'instagram' as keyof PlatformStatus, label: 'IG' },
+  { id: 'linkedin' as keyof PlatformStatus, label: 'LI' },
+  { id: 'tiktok' as keyof PlatformStatus, label: 'TT' },
+  { id: 'facebook' as keyof PlatformStatus, label: 'FB' },
+  { id: 'youtube' as keyof PlatformStatus, label: 'YT' },
 ]
 
 export default function TopBar() {
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchValue, setSearchValue] = useState('')
+  const [platformStatus, setPlatformStatus] = useState<PlatformStatus>(DEFAULT_STATUS)
+
+  const fetchStatus = () => {
+    fetch('/api/status')
+      .then(r => r.json())
+      .then((data: PlatformStatus) => setPlatformStatus(data))
+      .catch(() => {/* keep defaults */})
+  }
 
   useEffect(() => {
+    fetchStatus()
+    const interval = setInterval(fetchStatus, 60000)
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
@@ -25,7 +54,10 @@ export default function TopBar() {
       }
     }
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
   }, [])
 
   return (
@@ -33,9 +65,12 @@ export default function TopBar() {
       className="fixed top-0 right-0 h-16 flex items-center gap-4 px-6 z-40"
       style={{
         left: 64,
-        backgroundColor: 'rgba(8, 8, 16, 0.8)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        backgroundColor: 'rgba(8, 8, 16, 0.85)',
+        backdropFilter: 'blur(24px)',
+        borderBottom: '1px solid transparent',
+        backgroundImage: 'linear-gradient(rgba(8, 8, 16, 0.85), rgba(8, 8, 16, 0.85)), linear-gradient(to right, transparent, rgba(107,91,255,0.3), rgba(0,217,255,0.15), transparent)',
+        backgroundClip: 'padding-box, border-box',
+        backgroundOrigin: 'padding-box, border-box',
       }}
     >
       {/* Global Search */}
@@ -62,7 +97,7 @@ export default function TopBar() {
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
             className="flex-1 bg-transparent text-sm outline-none min-w-0"
-            style={{ color: '#F0F0FF' }}
+            style={{ color: '#F0F0FF', fontFamily: 'var(--font-body)' }}
           />
           <kbd
             className="text-[10px] px-1.5 py-0.5 rounded font-mono"
@@ -79,23 +114,27 @@ export default function TopBar() {
 
       {/* Platform Status Pills */}
       <div className="flex items-center gap-2">
-        {platforms.map((p) => (
-          <div
-            key={p.id}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium cursor-pointer transition-all"
-            style={{
-              backgroundColor: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              color: p.connected ? '#F0F0FF' : '#7B7B9A',
-            }}
-          >
-            <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: p.connected ? '#00E5A0' : '#FF4D6D' }}
-            />
-            {p.label}
-          </div>
-        ))}
+        {PLATFORM_PILLS.map((p) => {
+          const connected = platformStatus[p.id]
+          return (
+            <div
+              key={p.id}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium cursor-pointer transition-all"
+              title={connected ? `${p.id} connected` : `${p.id} not connected`}
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                color: connected ? '#F0F0FF' : '#7B7B9A',
+              }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ backgroundColor: connected ? '#00E5A0' : '#FF4D6D' }}
+              />
+              {p.label}
+            </div>
+          )
+        })}
       </div>
 
       <div className="flex-1" />

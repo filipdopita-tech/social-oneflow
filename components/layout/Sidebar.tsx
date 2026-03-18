@@ -62,8 +62,8 @@ export default function Sidebar() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.15 }}
-              className="ml-3 font-semibold text-sm whitespace-nowrap"
-              style={{ color: '#F0F0FF' }}
+              className="ml-3 font-bold text-base whitespace-nowrap"
+              style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)', letterSpacing: '-0.01em' }}
             >
               Social OneFlow
             </motion.span>
@@ -82,14 +82,9 @@ export default function Sidebar() {
                 style={{
                   backgroundColor: isActive ? 'rgba(107, 91, 255, 0.12)' : 'transparent',
                   borderLeft: isActive ? '2px solid #6B5BFF' : '2px solid transparent',
+                  boxShadow: isActive ? 'inset 4px 0 12px rgba(107,91,255,0.15)' : 'none',
                 }}
               >
-                {isActive && (
-                  <div
-                    className="absolute inset-0 rounded-xl opacity-20 pointer-events-none"
-                    style={{ boxShadow: 'inset 0 0 20px rgba(107, 91, 255, 0.3)' }}
-                  />
-                )}
                 <item.icon
                   size={18}
                   className="flex-shrink-0 transition-colors"
@@ -102,8 +97,12 @@ export default function Sidebar() {
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -10 }}
                       transition={{ duration: 0.15 }}
-                      className="ml-3 text-sm font-medium whitespace-nowrap"
-                      style={{ color: isActive ? '#F0F0FF' : '#7B7B9A' }}
+                      className="ml-3 text-sm whitespace-nowrap"
+                      style={{
+                        color: isActive ? '#F0F0FF' : '#7B7B9A',
+                        fontFamily: 'var(--font-body)',
+                        fontWeight: 500,
+                      }}
                     >
                       {item.label}
                     </motion.span>
@@ -135,8 +134,12 @@ export default function Sidebar() {
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -10 }}
                       transition={{ duration: 0.15 }}
-                      className="ml-3 text-sm font-medium whitespace-nowrap"
-                      style={{ color: isActive ? '#F0F0FF' : '#7B7B9A' }}
+                      className="ml-3 text-sm whitespace-nowrap"
+                      style={{
+                        color: isActive ? '#F0F0FF' : '#7B7B9A',
+                        fontFamily: 'var(--font-body)',
+                        fontWeight: 500,
+                      }}
                     >
                       {item.label}
                     </motion.span>

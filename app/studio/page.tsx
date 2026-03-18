@@ -54,37 +54,173 @@ Pokud řešíte provozní financování nebo hledáte stabilní alternativu k ba
 #fintech #investice #B2B #OneFlow`,
 }
 
+interface ParsedPost {
+  id: string
+  platform: string
+  type: string
+  content: string
+  hashtags: string[]
+  suggestedTime: string
+  tone: string
+}
+
+type ToastType = 'success' | 'error' | 'info'
+
+interface Toast {
+  id: number
+  message: string
+  type: ToastType
+}
+
 export default function StudioPage() {
   const [activePlatform, setActivePlatform] = useState('instagram')
   const [content, setContent] = useState(DEMO_CONTENT['instagram'] || '')
+  const [mediaUrl, setMediaUrl] = useState('')
   const [previewMode, setPreviewMode] = useState<'mobile' | 'desktop'>('mobile')
   const [driveUrl, setDriveUrl] = useState('')
   const [importing, setImporting] = useState(false)
   const [importStep, setImportStep] = useState(0)
+  const [importError, setImportError] = useState('')
+  const [parsedPosts, setParsedPosts] = useState<ParsedPost[]>([])
   const [tags, setTags] = useState(['investice', 'oneflow', 'finance'])
   const [newTag, setNewTag] = useState('')
   const [scheduledAt, setScheduledAt] = useState('2026-03-19T10:00')
+  const [publishing, setPublishing] = useState(false)
+  const [selectedPublishPlatforms, setSelectedPublishPlatforms] = useState<string[]>(['facebook', 'linkedin'])
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const [generatingVariants, setGeneratingVariants] = useState(false)
 
   const charLimit = CHAR_LIMITS[activePlatform]
   const charCount = content.length
   const charPercent = Math.min((charCount / charLimit) * 100, 100)
   const charColor = charPercent > 90 ? '#FF4D6D' : charPercent > 75 ? '#FFB800' : '#00E5A0'
 
+  const showToast = (message: string, type: ToastType = 'info') => {
+    const id = Date.now()
+    setToasts(prev => [...prev, { id, message, type }])
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
+  }
+
   const handlePlatformChange = (p: string) => {
     setActivePlatform(p)
     if (DEMO_CONTENT[p]) setContent(DEMO_CONTENT[p])
   }
 
-  const handleImport = () => {
+  const handleImport = async () => {
     if (!driveUrl) return
     setImporting(true)
     setImportStep(1)
-    setTimeout(() => setImportStep(2), 1200)
-    setTimeout(() => {
+    setImportError('')
+    setParsedPosts([])
+
+    try {
+      // Step 1: Fetch document text
+      setImportStep(1)
+      const fetchRes = await fetch('/api/drive/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: driveUrl }),
+      })
+      const fetchData = await fetchRes.json()
+      if (fetchData.error) throw new Error(fetchData.error)
+
+      // Step 2: Parse with AI
+      setImportStep(2)
+      const parseRes = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'parse_document', content: fetchData.text }),
+      })
+      const parseData = await parseRes.json()
+
+      // Step 3: Done
       setImportStep(3)
-      setContent('Importovaný obsah z Google Drive:\n\nToto je vzorový text extrahovaný z Google Dokumentu. Platforma automaticky detekovala typ obsahu a navrhuje sdílet na LinkedIn a Instagram.\n\nKlíčové body:\n• Investiční příležitost Q2 2026\n• Nový fond s 12% výnosem\n• Dostupné od 5 000 Kč')
+      const posts: ParsedPost[] = parseData.parsed?.posts || []
+      setParsedPosts(posts)
+
+      if (posts.length > 0) {
+        const first = posts[0]
+        setContent(first.content + (first.hashtags?.length ? '\n\n' + first.hashtags.map((h: string) => `#${h}`).join(' ') : ''))
+        setActivePlatform(first.platform in CHAR_LIMITS ? first.platform : 'instagram')
+        showToast(`Importováno ${posts.length} příspěvků z dokumentu`, 'success')
+      } else {
+        setContent(fetchData.text.substring(0, 2000))
+        showToast('Dokument importován, AI nenašla strukturované příspěvky', 'info')
+      }
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : String(err))
+      showToast('Chyba při importu: ' + (err instanceof Error ? err.message : String(err)), 'error')
+    } finally {
       setImporting(false)
-    }, 2800)
+    }
+  }
+
+  const handleGenerateVariants = async () => {
+    if (!content.trim()) return
+    setGeneratingVariants(true)
+    try {
+      const res = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate_variants',
+          content,
+          platforms: ['linkedin', 'instagram', 'facebook'],
+        }),
+      })
+      const data = await res.json()
+      if (data.variants && data.variants[activePlatform]) {
+        const variant = data.variants[activePlatform]
+        setContent(variant.text + (variant.hashtags?.length ? '\n\n' + variant.hashtags.map((h: string) => `#${h}`).join(' ') : ''))
+        showToast('Obsah přepsán pro ' + activePlatform, 'success')
+      }
+    } catch {
+      showToast('Chyba při generování variant', 'error')
+    } finally {
+      setGeneratingVariants(false)
+    }
+  }
+
+  const handlePublish = async () => {
+    if (!content.trim() || selectedPublishPlatforms.length === 0) {
+      showToast('Vyber alespoň jednu platformu a zadej obsah', 'error')
+      return
+    }
+    setPublishing(true)
+    try {
+      const res = await fetch('/api/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platforms: selectedPublishPlatforms,
+          content,
+          imageUrl: mediaUrl || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (data.results) {
+        Object.entries(data.results).forEach(([platform, result]) => {
+          const r = result as Record<string, unknown>
+          if (r.error) {
+            showToast(`${platform}: ${r.error}`, 'error')
+          } else if (r.id) {
+            showToast(`${platform}: Publikováno! ID: ${r.id}`, 'success')
+          } else {
+            showToast(`${platform}: Odpověď přijata`, 'info')
+          }
+        })
+      }
+    } catch (err) {
+      showToast('Chyba při publikování: ' + String(err), 'error')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  const togglePublishPlatform = (p: string) => {
+    setSelectedPublishPlatforms(prev =>
+      prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]
+    )
   }
 
   const addTag = (e: React.KeyboardEvent) => {
@@ -96,6 +232,28 @@ export default function StudioPage() {
 
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+      {/* Toast notifications */}
+      <div className="fixed top-20 right-4 z-50 flex flex-col gap-2">
+        <AnimatePresence>
+          {toasts.map(toast => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 50 }}
+              className="px-4 py-3 rounded-xl text-sm font-medium max-w-xs"
+              style={{
+                backgroundColor: toast.type === 'success' ? 'rgba(0,229,160,0.15)' : toast.type === 'error' ? 'rgba(255,77,109,0.15)' : 'rgba(107,91,255,0.15)',
+                border: `1px solid ${toast.type === 'success' ? 'rgba(0,229,160,0.4)' : toast.type === 'error' ? 'rgba(255,77,109,0.4)' : 'rgba(107,91,255,0.4)'}`,
+                color: toast.type === 'success' ? '#00E5A0' : toast.type === 'error' ? '#FF4D6D' : '#6B5BFF',
+              }}
+            >
+              {toast.message}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       {/* LEFT PANEL */}
       <div className="flex flex-col overflow-hidden" style={{ width: '55%', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
         {/* Header */}
@@ -145,9 +303,9 @@ export default function StudioPage() {
                   className="mb-3 space-y-2"
                 >
                   {[
-                    { step: 1, label: 'Detekce dokumentu...' },
-                    { step: 2, label: 'Mapování platformy...' },
-                    { step: 3, label: 'Extrakce obsahu...' },
+                    { step: 1, label: 'Stahování dokumentu...' },
+                    { step: 2, label: 'AI analýza obsahu...' },
+                    { step: 3, label: 'Extrakce příspěvků...' },
                   ].map((s) => (
                     <div key={s.step} className="flex items-center gap-2 text-xs" style={{ color: importStep >= s.step ? '#00E5A0' : '#7B7B9A' }}>
                       <CheckCircle size={12} style={{ opacity: importStep >= s.step ? 1 : 0.3 }} />
@@ -157,6 +315,37 @@ export default function StudioPage() {
                 </motion.div>
               )}
             </AnimatePresence>
+            {importError && (
+              <p className="text-xs mb-3 px-2 py-1.5 rounded-lg" style={{ color: '#FF4D6D', backgroundColor: 'rgba(255,77,109,0.1)' }}>
+                {importError}
+              </p>
+            )}
+            {parsedPosts.length > 0 && !importing && (
+              <div className="mb-3 space-y-1">
+                <p className="text-xs font-semibold mb-2" style={{ color: '#00E5A0' }}>
+                  {parsedPosts.length} příspěvků importováno
+                </p>
+                {parsedPosts.map((post, i) => (
+                  <button
+                    key={post.id}
+                    onClick={() => {
+                      setContent(post.content + (post.hashtags?.length ? '\n\n' + post.hashtags.map((h: string) => `#${h}`).join(' ') : ''))
+                      setActivePlatform(post.platform in CHAR_LIMITS ? post.platform : 'instagram')
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg text-xs truncate transition-all"
+                    style={{ backgroundColor: 'rgba(107,91,255,0.08)', color: '#7B7B9A', border: '1px solid rgba(107,91,255,0.15)' }}
+                  >
+                    <span
+                      className="font-semibold mr-2"
+                      style={{ color: platformColors[post.platform] || '#6B5BFF' }}
+                    >
+                      {post.platform.toUpperCase().slice(0, 2)}
+                    </span>
+                    {post.content.slice(0, 60)}...
+                  </button>
+                ))}
+              </div>
+            )}
             <button
               onClick={handleImport}
               disabled={!driveUrl || importing}
@@ -218,8 +407,21 @@ export default function StudioPage() {
 
             {/* AI Actions */}
             <div className="flex gap-2 mt-3 flex-wrap">
+              <button
+                onClick={handleGenerateVariants}
+                disabled={generatingVariants}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                style={{
+                  backgroundColor: 'rgba(107,91,255,0.1)',
+                  border: '1px solid rgba(107,91,255,0.2)',
+                  color: '#6B5BFF',
+                  opacity: generatingVariants ? 0.7 : 1,
+                }}
+              >
+                <RefreshCw size={12} className={generatingVariants ? 'animate-spin' : ''} />
+                {generatingVariants ? 'Generuji...' : 'Přepsat pro platformu'}
+              </button>
               {[
-                { icon: RefreshCw, label: 'Přepsat pro platformu' },
                 { icon: Scissors, label: 'Zkrátit' },
                 { icon: Zap, label: 'Generovat hooks' },
                 { icon: CheckCircle, label: 'Brand voice' },
@@ -240,16 +442,44 @@ export default function StudioPage() {
             </div>
           </div>
 
-          {/* Media Upload */}
+          {/* Media URL */}
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: '#7B7B9A' }}>Média</label>
+            <label className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: '#7B7B9A' }}>Média (URL obrázku)</label>
             <div
-              className="rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all"
-              style={{ border: '1px dashed rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.02)' }}
+              className="rounded-xl p-3 flex items-center gap-2"
+              style={{ backgroundColor: '#16162A', border: '1px solid rgba(255,255,255,0.06)' }}
             >
-              <Upload size={24} style={{ color: '#7B7B9A' }} />
-              <p className="text-sm" style={{ color: '#7B7B9A' }}>Přetáhněte soubory nebo klikněte pro upload</p>
-              <p className="text-xs" style={{ color: '#7B7B9A' }}>PNG, JPG, MP4, GIF — max 100MB</p>
+              <Upload size={14} style={{ color: '#7B7B9A' }} />
+              <input
+                type="text"
+                placeholder="https://... (veřejná URL obrázku pro Instagram)"
+                value={mediaUrl}
+                onChange={(e) => setMediaUrl(e.target.value)}
+                className="flex-1 bg-transparent text-sm outline-none"
+                style={{ color: '#F0F0FF' }}
+              />
+            </div>
+          </div>
+
+          {/* Publish Platform Selection */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: '#7B7B9A' }}>Publikovat na</label>
+            <div className="flex gap-2 flex-wrap">
+              {PLATFORMS.map(p => (
+                <button
+                  key={p}
+                  onClick={() => togglePublishPlatform(p)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                  style={{
+                    backgroundColor: selectedPublishPlatforms.includes(p) ? platformColors[p] + '20' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${selectedPublishPlatforms.includes(p) ? platformColors[p] + '60' : 'rgba(255,255,255,0.06)'}`,
+                    color: selectedPublishPlatforms.includes(p) ? platformColors[p] : '#7B7B9A',
+                  }}
+                >
+                  {selectedPublishPlatforms.includes(p) && <CheckCircle size={10} />}
+                  {p === 'instagram' ? 'IG' : p === 'linkedin' ? 'LI' : p === 'tiktok' ? 'TT' : p === 'facebook' ? 'FB' : 'YT'}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -356,10 +586,16 @@ export default function StudioPage() {
             Naplánovat
           </button>
           <button
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-            style={{ background: 'linear-gradient(135deg, #6B5BFF, #5A4BEE)', color: '#fff' }}
+            onClick={handlePublish}
+            disabled={publishing}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
+            style={{
+              background: publishing ? 'rgba(107,91,255,0.3)' : 'linear-gradient(135deg, #6B5BFF, #5A4BEE)',
+              color: '#fff',
+              opacity: publishing ? 0.8 : 1,
+            }}
           >
-            Publikovat nyní
+            {publishing ? 'Publikuji...' : 'Publikovat nyní'}
           </button>
         </div>
       </div>
@@ -416,12 +652,17 @@ export default function StudioPage() {
                     </div>
                     <span className="text-xs font-semibold" style={{ color: '#3897f0' }}>Sledovat</span>
                   </div>
-                  {/* Image placeholder */}
+                  {/* Image placeholder or real image */}
                   <div
-                    className="flex items-center justify-center"
+                    className="flex items-center justify-center overflow-hidden"
                     style={{ height: 300, background: 'linear-gradient(135deg, rgba(107,91,255,0.3), rgba(0,217,255,0.2))' }}
                   >
-                    <Wand2 size={40} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                    {mediaUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={mediaUrl} alt="Media" className="w-full h-full object-cover" />
+                    ) : (
+                      <Wand2 size={40} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                    )}
                   </div>
                   {/* Actions */}
                   <div className="px-3 py-2">
