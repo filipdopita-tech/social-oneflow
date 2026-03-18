@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getYouTubeChannelStats, getYouTubeVideos } from '@/lib/api/youtube'
 
+export const revalidate = 300
+
 export async function GET() {
   try {
     const [channel, videos] = await Promise.allSettled([
