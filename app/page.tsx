@@ -1,50 +1,107 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
+import Link from 'next/link'
 import {
-  Users, Eye, BarChart2, Calendar, TrendingUp, Clock, Zap, Upload, Send, ArrowRight, Activity,
+  Users, BarChart2, Calendar, TrendingUp, Upload, Send, ArrowRight, Activity,
+  Image, Video, Layers, Heart, MessageCircle, Radio,
 } from 'lucide-react'
-import StatCard from '@/components/ui/StatCard'
 import CircularProgress from '@/components/ui/CircularProgress'
-import PlatformBadge from '@/components/ui/PlatformBadge'
 import GlassCard from '@/components/ui/GlassCard'
 
-const todayPosts = [
-  { id: 1, platform: 'instagram', time: '08:00', text: 'Investice jsou maraton, ne sprint. Jak chránit svůj kapitál...', status: 'scheduled' as const },
-  { id: 2, platform: 'linkedin', time: '10:30', text: '5 věcí, které každý founder musí vědět o cash flow...', status: 'scheduled' as const },
-  { id: 3, platform: 'facebook', time: '12:00', text: 'OneFlow partnerský program – pasivní příjem bez rizika...', status: 'published' as const },
-  { id: 4, platform: 'tiktok', time: '15:00', text: 'POV: Tvoje investice roste 12% ročně bez stresu...', status: 'review' as const },
-  { id: 5, platform: 'youtube', time: '18:00', text: 'Jak OneFlow generuje stabilní výnos pro české firmy...', status: 'draft' as const },
-]
+interface IGPost {
+  id: string
+  caption?: string
+  media_type: string
+  media_url?: string
+  thumbnail_url?: string
+  timestamp: string
+  like_count: number
+  comments_count: number
+}
 
-const recentActivity = [
-  { who: 'Jana N.', action: 'publikovala příspěvek na Instagram', when: '2 min', avatar: 'J', color: '#E1306C' },
-  { who: 'Filip D.', action: 'schválil kampaň Q1 2026', when: '14 min', avatar: 'F', color: '#6B5BFF' },
-  { who: 'Martin K.', action: 'nahrál 3 nové obrázky do Library', when: '1 hod', avatar: 'M', color: '#00D9FF' },
-  { who: 'Jana N.', action: 'vytvořila draft pro LinkedIn sérii', when: '2 hod', avatar: 'J', color: '#E1306C' },
-  { who: 'Filip D.', action: 'nastavil kampaň Jarní Investice', when: '3 hod', avatar: 'F', color: '#6B5BFF' },
-]
+interface FBPost {
+  id: string
+  message?: string
+  story?: string
+  created_time: string
+  likes?: { summary: { total_count: number } }
+  comments?: { summary: { total_count: number } }
+}
 
-const platforms = [
-  { id: 'instagram', name: 'Instagram', followers: '12.4K', reach: '48.2K', engagement: '4.8%', score: 82, color: '#E1306C' },
-  { id: 'linkedin', name: 'LinkedIn', followers: '8.7K', reach: '31.5K', engagement: '5.2%', score: 91, color: '#0A66C2' },
-  { id: 'tiktok', name: 'TikTok', followers: '24.1K', reach: '187K', engagement: '6.4%', score: 76, color: '#00D9FF' },
-  { id: 'facebook', name: 'Facebook', followers: '5.3K', reach: '22.1K', engagement: '2.1%', score: 64, color: '#1877F2' },
-  { id: 'youtube', name: 'YouTube', followers: '3.8K', reach: '14.7K', engagement: '3.9%', score: 71, color: '#FF4444' },
-  { id: 'pinterest', name: 'Pinterest', followers: '1.2K', reach: '8.3K', engagement: '1.8%', score: 58, color: '#E60023' },
-]
+interface DashboardData {
+  instagram: {
+    username: string
+    followers: number
+    following: number
+    posts: number
+    bio: string
+    avatar: string
+    avgEngagement: string
+    recentPosts: IGPost[]
+  } | null
+  facebook: {
+    name: string
+    fans: number
+    followers: number
+    recentPosts: FBPost[]
+  } | null
+  linkedin: {
+    name: string
+    firstName: string
+    lastName: string
+    email: string
+    avatar: string
+  } | null
+  youtube: null
+  tiktok: null
+  fetchedAt: string
+}
 
-const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
-  draft: { color: '#7B7B9A', bg: 'rgba(123,123,154,0.15)', label: 'Draft' },
-  scheduled: { color: '#FFB800', bg: 'rgba(255,184,0,0.15)', label: 'Naplánováno' },
-  published: { color: '#00E5A0', bg: 'rgba(0,229,160,0.15)', label: 'Publikováno' },
-  review: { color: '#00D9FF', bg: 'rgba(0,217,255,0.15)', label: 'Review' },
+function timeAgo(timestamp: string): string {
+  const diff = Date.now() - new Date(timestamp).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h`
+  const days = Math.floor(hrs / 24)
+  return `${days}d`
+}
+
+function MediaTypeIcon({ type }: { type: string }) {
+  if (type === 'VIDEO') return <Video size={12} style={{ color: '#00D9FF' }} />
+  if (type === 'CAROUSEL_ALBUM') return <Layers size={12} style={{ color: '#FFB800' }} />
+  return <Image size={12} style={{ color: '#E1306C' }} />
+}
+
+function SkeletonBox({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`animate-pulse rounded-xl ${className ?? ''}`}
+      style={{ backgroundColor: 'rgba(255,255,255,0.06)', ...style }}
+    />
+  )
 }
 
 export default function DashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+
   const now = new Date()
   const hour = now.getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+
+  useEffect(() => {
+    fetch('/api/dashboard')
+      .then(r => r.json())
+      .then((d: DashboardData) => { setData(d); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const ig = data?.instagram
+  const fb = data?.facebook
+  const li = data?.linkedin
 
   return (
     <div className="p-8 max-w-[1600px]">
@@ -74,13 +131,14 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
+          <Link
+            href="/studio?tab=import"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
             style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#F0F0FF' }}
           >
             <Upload size={15} />
             Import z Drive
-          </button>
+          </Link>
           <button
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
             style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#F0F0FF' }}
@@ -88,248 +146,425 @@ export default function DashboardPage() {
             <Send size={15} />
             Schedule All
           </button>
-          <button
+          <Link
+            href="/studio"
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold"
             style={{ background: 'linear-gradient(135deg, #6B5BFF, #5A4BEE)', color: '#fff', boxShadow: '0 0 20px rgba(107,91,255,0.3)' }}
           >
             <span style={{ fontSize: 16 }}>+</span>
             Nový příspěvek
-          </button>
+          </Link>
         </div>
       </motion.div>
 
-      {/* AI Brief */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1, duration: 0.4 }}
-        className="mb-8 p-5 rounded-2xl"
-        style={{
-          background: 'linear-gradient(135deg, rgba(107,91,255,0.1), rgba(0,217,255,0.04))',
-          border: '1px solid rgba(107,91,255,0.25)',
-          borderLeft: '3px solid #6B5BFF',
-        }}
-      >
-        <div className="flex items-center gap-2 mb-3">
-          <Zap size={16} style={{ color: '#6B5BFF' }} />
-          <span className="text-sm font-semibold" style={{ color: '#6B5BFF' }}>AI denní brief</span>
+      {/* Platform Overview */}
+      <GlassCard delay={0.1} className="mb-8 p-6 premium-card">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>
+              Platform Overview
+            </h2>
+            {!loading && data && (
+              <span
+                className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold"
+                style={{
+                  backgroundColor: 'rgba(0,229,160,0.15)',
+                  border: '1px solid rgba(0,229,160,0.4)',
+                  color: '#00E5A0',
+                }}
+              >
+                <Radio size={10} />
+                Live Data
+              </span>
+            )}
+          </div>
+          <Link href="/analytics" className="flex items-center gap-1 text-sm" style={{ color: '#6B5BFF' }}>
+            Zobrazit vše <ArrowRight size={14} />
+          </Link>
         </div>
-        <ul className="space-y-2">
-          {[
-            { dot: '#00E5A0', text: 'TikTok engagement vzrostl o 18% — ideální čas publikovat video o investičních příležitostech' },
-            { dot: '#FFB800', text: 'LinkedIn příspěvek z úterý dosahuje nejlepšího CTR v historii (8.3%) — doporučuji boostat' },
-            { dot: '#00D9FF', text: 'Máte 2 příspěvky čekající na schválení a kampaň Q1 končí za 3 dny' },
-          ].map((item, i) => (
-            <li key={i} className="flex items-start gap-2 text-sm" style={{ color: '#F0F0FF' }}>
-              <span style={{ color: item.dot, marginTop: 1 }}>•</span>
-              {item.text}
-            </li>
-          ))}
-        </ul>
-      </motion.div>
 
-      {/* Top row: Content Score + Stats */}
-      <div className="grid grid-cols-12 gap-6 mb-8">
-        {/* Content Score */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.15, duration: 0.4 }}
-          className="col-span-3 rounded-2xl p-6 flex flex-col items-center justify-center premium-card"
-          style={{
-            background: 'radial-gradient(ellipse at center top, rgba(107,91,255,0.08) 0%, #0F0F1A 70%)',
-            border: '1px solid rgba(255,255,255,0.06)',
-          }}
-        >
-          <p className="text-sm font-medium mb-4" style={{ color: '#7B7B9A' }}>Content Health Score</p>
-          <div style={{ filter: 'drop-shadow(0 0 20px rgba(107,91,255,0.4))' }}>
-            <CircularProgress value={87} size={140} strokeWidth={10} color="#6B5BFF" />
-          </div>
-          <div className="mt-4 text-center">
-            <p className="text-xs font-semibold" style={{ color: '#00E5A0' }}>Excellent</p>
-            <p className="text-xs mt-1" style={{ color: '#7B7B9A' }}>+5 bodů oproti minulý týden</p>
-          </div>
-          <div className="w-full mt-4 space-y-2">
-            {[
-              { label: 'Konzistence', value: 92 },
-              { label: 'Engagement', value: 85 },
-              { label: 'Brand Voice', value: 88 },
-            ].map((m) => (
-              <div key={m.label} className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: '#7B7B9A' }}>{m.label}</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-24 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
-                    <div className="h-full rounded-full" style={{ width: `${m.value}%`, backgroundColor: '#6B5BFF' }} />
-                  </div>
-                  <span className="text-xs font-medium" style={{ color: '#F0F0FF', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{m.value}</span>
-                </div>
-              </div>
+        {loading ? (
+          <div className="grid grid-cols-5 gap-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <SkeletonBox key={i} style={{ height: 140 }} />
             ))}
           </div>
-        </motion.div>
-
-        {/* Stats 2x2 grid */}
-        <div className="col-span-9 grid grid-cols-2 gap-4">
-          <StatCard
-            title="Celkový dosah (měsíc)"
-            value="312,480"
-            change={14.2}
-            data={[210000, 230000, 245000, 220000, 260000, 285000, 312480]}
-            color="#6B5BFF"
-            icon={<Eye size={18} />}
-            delay={0.2}
-          />
-          <StatCard
-            title="Engagement Rate"
-            value="4.72%"
-            change={8.3}
-            data={[3.1, 3.8, 4.1, 3.9, 4.4, 4.6, 4.72]}
-            color="#00D9FF"
-            icon={<TrendingUp size={18} />}
-            delay={0.25}
-          />
-          <StatCard
-            title="Příspěvky naplánované"
-            value="47"
-            change={22.5}
-            data={[20, 25, 31, 28, 38, 42, 47]}
-            color="#00E5A0"
-            icon={<Calendar size={18} />}
-            delay={0.3}
-          />
-          <StatCard
-            title="Aktivní kampaně"
-            value="5"
-            change={-1}
-            data={[3, 4, 6, 5, 5, 6, 5]}
-            color="#FFB800"
-            icon={<BarChart2 size={18} />}
-            delay={0.35}
-          />
-        </div>
-      </div>
-
-      {/* Platform Performance */}
-      <GlassCard delay={0.4} className="mb-8 p-6 premium-card">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>Platform Performance</h2>
-          <button className="flex items-center gap-1 text-sm" style={{ color: '#6B5BFF' }}>
-            Zobrazit vše <ArrowRight size={14} />
-          </button>
-        </div>
-        <div className="grid grid-cols-6 gap-4">
-          {platforms.map((p, i) => (
+        ) : (
+          <div className="grid grid-cols-5 gap-4">
+            {/* Instagram */}
             <motion.div
-              key={p.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 + i * 0.05 }}
+              transition={{ delay: 0.15 }}
               whileHover={{ scale: 1.03 }}
               className="p-4 rounded-xl flex flex-col items-center text-center cursor-pointer premium-card"
-              style={{
-                backgroundColor: '#16162A',
-                border: '1px solid rgba(255,255,255,0.04)',
-                transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
-              }}
+              style={{ backgroundColor: '#16162A', border: '1px solid rgba(255,255,255,0.04)' }}
             >
-              <CircularProgress value={p.score} size={72} strokeWidth={6} color={p.color} showValue={true} />
-              <p className="text-xs font-semibold mt-2" style={{ color: '#F0F0FF' }}>{p.name}</p>
-              <p className="text-xs mt-1" style={{ color: '#7B7B9A' }}>{p.followers}</p>
-              <div className="mt-2 w-full">
+              <div className="w-12 h-12 rounded-full mb-2 overflow-hidden flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #E1306C, #F56040, #FCAF45)', padding: ig?.avatar ? 0 : 2 }}>
+                {ig?.avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={ig.avatar} alt="IG" className="w-full h-full object-cover rounded-full" />
+                ) : (
+                  <span className="text-white font-bold text-sm">IG</span>
+                )}
+              </div>
+              <p className="text-xs font-semibold" style={{ color: '#F0F0FF' }}>Instagram</p>
+              <p className="text-xs mt-0.5" style={{ color: '#7B7B9A' }}>@{ig?.username ?? 'oneflowcast'}</p>
+              <p className="text-xl font-bold mt-2" style={{ color: '#E1306C', fontFamily: 'var(--font-mono)' }}>
+                {ig?.followers?.toLocaleString('cs') ?? '–'}
+              </p>
+              <p className="text-[10px]" style={{ color: '#7B7B9A' }}>sledujících</p>
+              <div className="mt-2 w-full space-y-1">
                 <div className="flex justify-between text-[10px]">
-                  <span style={{ color: '#7B7B9A' }}>Reach</span>
-                  <span style={{ color: p.color }}>{p.reach}</span>
+                  <span style={{ color: '#7B7B9A' }}>Příspěvky</span>
+                  <span style={{ color: '#F0F0FF' }}>{ig?.posts?.toLocaleString('cs') ?? '–'}</span>
                 </div>
-                <div className="flex justify-between text-[10px] mt-0.5">
-                  <span style={{ color: '#7B7B9A' }}>Eng.</span>
-                  <span style={{ color: '#00E5A0' }}>{p.engagement}</span>
+                <div className="flex justify-between text-[10px]">
+                  <span style={{ color: '#7B7B9A' }}>Avg eng.</span>
+                  <span style={{ color: '#00E5A0' }}>{ig?.avgEngagement ?? '–'}</span>
                 </div>
               </div>
             </motion.div>
-          ))}
-        </div>
+
+            {/* Facebook */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              whileHover={{ scale: 1.03 }}
+              className="p-4 rounded-xl flex flex-col items-center text-center cursor-pointer premium-card"
+              style={{ backgroundColor: '#16162A', border: '1px solid rgba(255,255,255,0.04)' }}
+            >
+              <div className="w-12 h-12 rounded-full mb-2 flex items-center justify-center"
+                style={{ backgroundColor: 'rgba(24,119,242,0.2)' }}>
+                <span className="font-bold text-lg" style={{ color: '#1877F2' }}>f</span>
+              </div>
+              <p className="text-xs font-semibold" style={{ color: '#F0F0FF' }}>Facebook</p>
+              <p className="text-xs mt-0.5 truncate w-full" style={{ color: '#7B7B9A' }}>{fb?.name ?? 'OneFlow'}</p>
+              <p className="text-xl font-bold mt-2" style={{ color: '#1877F2', fontFamily: 'var(--font-mono)' }}>
+                {fb?.fans?.toLocaleString('cs') ?? '–'}
+              </p>
+              <p className="text-[10px]" style={{ color: '#7B7B9A' }}>fanoušků</p>
+              <div className="mt-2 w-full space-y-1">
+                <div className="flex justify-between text-[10px]">
+                  <span style={{ color: '#7B7B9A' }}>Sledující</span>
+                  <span style={{ color: '#F0F0FF' }}>{fb?.followers?.toLocaleString('cs') ?? '–'}</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* LinkedIn */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              whileHover={{ scale: 1.03 }}
+              className="p-4 rounded-xl flex flex-col items-center text-center cursor-pointer premium-card"
+              style={{ backgroundColor: '#16162A', border: '1px solid rgba(255,255,255,0.04)' }}
+            >
+              <div className="w-12 h-12 rounded-full mb-2 overflow-hidden flex items-center justify-center"
+                style={{ backgroundColor: 'rgba(10,102,194,0.2)' }}>
+                {li?.avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={li.avatar} alt="LI" className="w-full h-full object-cover rounded-full" />
+                ) : (
+                  <span className="font-bold text-sm" style={{ color: '#0A66C2' }}>in</span>
+                )}
+              </div>
+              <p className="text-xs font-semibold" style={{ color: '#F0F0FF' }}>LinkedIn</p>
+              <p className="text-xs mt-0.5" style={{ color: '#7B7B9A' }}>{li?.name ?? 'Filip Dopita'}</p>
+              <span
+                className="mt-2 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: 'rgba(0,229,160,0.15)', color: '#00E5A0', border: '1px solid rgba(0,229,160,0.3)' }}
+              >
+                Připojeno
+              </span>
+              <div className="mt-2 w-full">
+                <div className="flex justify-between text-[10px]">
+                  <span style={{ color: '#7B7B9A' }}>Posting</span>
+                  <span style={{ color: '#00E5A0' }}>funkční</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* YouTube */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="p-4 rounded-xl flex flex-col items-center text-center"
+              style={{ backgroundColor: '#16162A', border: '1px solid rgba(255,255,255,0.04)', opacity: 0.6 }}
+            >
+              <div className="w-12 h-12 rounded-full mb-2 flex items-center justify-center"
+                style={{ backgroundColor: 'rgba(255,68,68,0.15)' }}>
+                <span className="font-bold text-sm" style={{ color: '#FF4444' }}>YT</span>
+              </div>
+              <p className="text-xs font-semibold" style={{ color: '#F0F0FF' }}>YouTube</p>
+              <span
+                className="mt-2 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: 'rgba(255,184,0,0.15)', color: '#FFB800', border: '1px solid rgba(255,184,0,0.3)' }}
+              >
+                Není k dispozici
+              </span>
+              <p className="text-[10px] mt-2 text-center" style={{ color: '#7B7B9A' }}>
+                Token scope: upload only
+              </p>
+            </motion.div>
+
+            {/* TikTok */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="p-4 rounded-xl flex flex-col items-center text-center"
+              style={{ backgroundColor: '#16162A', border: '1px solid rgba(255,255,255,0.04)', opacity: 0.6 }}
+            >
+              <div className="w-12 h-12 rounded-full mb-2 flex items-center justify-center"
+                style={{ backgroundColor: 'rgba(0,217,255,0.15)' }}>
+                <span className="font-bold text-sm" style={{ color: '#00D9FF' }}>TT</span>
+              </div>
+              <p className="text-xs font-semibold" style={{ color: '#F0F0FF' }}>TikTok</p>
+              <span
+                className="mt-2 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: 'rgba(255,77,109,0.15)', color: '#FF4D6D', border: '1px solid rgba(255,77,109,0.3)' }}
+              >
+                Čeká na schválení
+              </span>
+              <p className="text-[10px] mt-2 text-center" style={{ color: '#7B7B9A' }}>
+                App pending review
+              </p>
+            </motion.div>
+          </div>
+        )}
       </GlassCard>
 
-      {/* Bottom row: Today's Queue + Activity */}
+      {/* Bottom row: Instagram posts + Facebook posts + LinkedIn */}
       <div className="grid grid-cols-12 gap-6">
-        {/* Today's Queue */}
-        <GlassCard delay={0.5} className="col-span-7 p-6 premium-card">
+        {/* Recent Instagram Posts */}
+        <GlassCard delay={0.4} className="col-span-7 p-6 premium-card">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="text-lg font-semibold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>Dnešní fronta</h2>
-              <p className="text-xs mt-0.5" style={{ color: '#7B7B9A' }}>5 příspěvků naplánováno na dnes</p>
+              <h2 className="text-lg font-semibold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>
+                Instagram – poslední příspěvky
+              </h2>
+              <p className="text-xs mt-0.5" style={{ color: '#7B7B9A' }}>
+                {ig ? `@${ig.username} · ${ig.posts} celkem` : 'Načítání...'}
+              </p>
             </div>
-            <button className="flex items-center gap-1 text-sm" style={{ color: '#6B5BFF' }}>
-              Spravovat <ArrowRight size={14} />
-            </button>
+            <Link href="/analytics" className="flex items-center gap-1 text-sm" style={{ color: '#6B5BFF' }}>
+              Zobrazit vše <ArrowRight size={14} />
+            </Link>
           </div>
-          <div className="space-y-3">
-            {todayPosts.map((post, i) => {
-              const st = statusConfig[post.status]
-              return (
+
+          {loading ? (
+            <div className="grid grid-cols-3 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <SkeletonBox key={i} style={{ height: 100 }} />
+              ))}
+            </div>
+          ) : ig?.recentPosts?.length ? (
+            <div className="grid grid-cols-3 gap-3">
+              {ig.recentPosts.map((post, i) => (
                 <motion.div
                   key={post.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.5 + i * 0.06 }}
-                  whileHover={{ backgroundColor: '#16162A' }}
-                  className="flex items-center gap-4 p-3.5 rounded-xl cursor-pointer"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 + i * 0.05 }}
+                  className="p-3 rounded-xl cursor-pointer"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
                 >
-                  <PlatformBadge platform={post.platform} size="md" />
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <Clock size={13} style={{ color: '#7B7B9A' }} />
-                    <span className="text-xs font-medium" style={{ color: '#7B7B9A' }}>{post.time}</span>
+                  <div className="flex items-center gap-1 mb-1.5">
+                    <MediaTypeIcon type={post.media_type} />
+                    <span className="text-[10px]" style={{ color: '#7B7B9A' }}>{timeAgo(post.timestamp)}</span>
                   </div>
-                  <p className="flex-1 text-sm truncate" style={{ color: '#F0F0FF' }}>{post.text}</p>
-                  <span
-                    className="text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0"
-                    style={{ color: st.color, backgroundColor: st.bg }}
-                  >
-                    {st.label}
-                  </span>
+                  <p className="text-xs line-clamp-2 mb-2" style={{ color: '#F0F0FF' }}>
+                    {post.caption ? post.caption.slice(0, 60) + (post.caption.length > 60 ? '…' : '') : '(bez popisku)'}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1 text-[10px]" style={{ color: '#E1306C' }}>
+                      <Heart size={10} /> {post.like_count}
+                    </span>
+                    <span className="flex items-center gap-1 text-[10px]" style={{ color: '#7B7B9A' }}>
+                      <MessageCircle size={10} /> {post.comments_count}
+                    </span>
+                  </div>
                 </motion.div>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-center py-8" style={{ color: '#7B7B9A' }}>
+              {data ? 'Žádné příspěvky k zobrazení' : 'Nepodařilo se načíst data'}
+            </p>
+          )}
         </GlassCard>
 
-        {/* Recent Activity */}
-        <GlassCard delay={0.55} className="col-span-5 p-6 premium-card">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-lg font-semibold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>Nedávná aktivita</h2>
-              <p className="text-xs mt-0.5" style={{ color: '#7B7B9A' }}>Co se děje v týmu</p>
+        {/* Right column: Facebook + LinkedIn + Stats */}
+        <div className="col-span-5 flex flex-col gap-6">
+          {/* Facebook Recent Posts */}
+          <GlassCard delay={0.45} className="p-5 premium-card flex-1">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>
+                Facebook – příspěvky
+              </h2>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: 'rgba(24,119,242,0.15)', color: '#1877F2' }}>
+                {fb?.fans ?? '–'} fanoušků
+              </span>
             </div>
-            <Activity size={16} style={{ color: '#7B7B9A' }} />
-          </div>
-          <div className="space-y-4">
-            {recentActivity.map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.55 + i * 0.06 }}
-                className="flex items-start gap-3"
+            {loading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => <SkeletonBox key={i} style={{ height: 50 }} />)}
+              </div>
+            ) : fb?.recentPosts?.length ? (
+              <div className="space-y-2">
+                {fb.recentPosts.slice(0, 3).map((post, i) => (
+                  <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.45 + i * 0.05 }}
+                    className="p-3 rounded-xl"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+                  >
+                    <p className="text-xs line-clamp-2 mb-1" style={{ color: '#F0F0FF' }}>
+                      {post.message ?? post.story ?? '(bez textu)'}
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px]" style={{ color: '#7B7B9A' }}>
+                        {new Date(post.created_time).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
+                      </span>
+                      <span className="flex items-center gap-1 text-[10px]" style={{ color: '#1877F2' }}>
+                        <Heart size={10} /> {post.likes?.summary?.total_count ?? 0}
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs" style={{ color: '#7B7B9A' }}>
+                {data ? 'Žádné příspěvky' : 'Načítání...'}
+              </p>
+            )}
+          </GlassCard>
+
+          {/* LinkedIn + Quick Stats */}
+          <GlassCard delay={0.5} className="p-5 premium-card">
+            <div className="flex items-center gap-3 mb-4">
+              <Activity size={16} style={{ color: '#0A66C2' }} />
+              <h2 className="text-base font-semibold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-display)' }}>
+                LinkedIn
+              </h2>
+              <span
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: 'rgba(0,229,160,0.15)', color: '#00E5A0', border: '1px solid rgba(0,229,160,0.3)' }}
               >
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                  style={{ backgroundColor: `${item.color}20`, color: item.color }}
-                >
-                  {item.avatar}
+                Připojeno
+              </span>
+            </div>
+            {loading ? (
+              <SkeletonBox style={{ height: 60 }} />
+            ) : li ? (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0"
+                  style={{ backgroundColor: 'rgba(10,102,194,0.2)' }}>
+                  {li.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={li.avatar} alt={li.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-sm font-bold"
+                      style={{ color: '#0A66C2' }}>
+                      {li.firstName?.[0]}{li.lastName?.[0]}
+                    </div>
+                  )}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm" style={{ color: '#F0F0FF' }}>
-                    <span className="font-medium">{item.who}</span>{' '}
-                    <span style={{ color: '#7B7B9A' }}>{item.action}</span>
-                  </p>
-                  <p className="text-xs mt-0.5" style={{ color: '#7B7B9A' }}>před {item.when}</p>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: '#F0F0FF' }}>{li.name}</p>
+                  <p className="text-xs" style={{ color: '#7B7B9A' }}>{li.email}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: '#7B7B9A' }}>Publikování: funkční</p>
                 </div>
-              </motion.div>
-            ))}
+              </div>
+            ) : (
+              <p className="text-xs" style={{ color: '#7B7B9A' }}>Nedostupné</p>
+            )}
+          </GlassCard>
+
+          {/* Quick stats */}
+          <div className="grid grid-cols-2 gap-3">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.55 }}
+              className="p-4 rounded-xl"
+              style={{ backgroundColor: '#0F0F1A', border: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp size={14} style={{ color: '#6B5BFF' }} />
+                <p className="text-xs" style={{ color: '#7B7B9A' }}>IG Avg. eng.</p>
+              </div>
+              <p className="text-xl font-bold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-mono)' }}>
+                {loading ? '–' : ig?.avgEngagement ?? '–'}
+              </p>
+              <p className="text-[10px] mt-0.5" style={{ color: '#7B7B9A' }}>na příspěvek</p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="p-4 rounded-xl"
+              style={{ backgroundColor: '#0F0F1A', border: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart2 size={14} style={{ color: '#00E5A0' }} />
+                <p className="text-xs" style={{ color: '#7B7B9A' }}>IG Příspěvky</p>
+              </div>
+              <p className="text-xl font-bold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-mono)' }}>
+                {loading ? '–' : ig?.posts?.toLocaleString('cs') ?? '–'}
+              </p>
+              <p className="text-[10px] mt-0.5" style={{ color: '#7B7B9A' }}>celkem</p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.65 }}
+              className="p-4 rounded-xl"
+              style={{ backgroundColor: '#0F0F1A', border: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <Users size={14} style={{ color: '#E1306C' }} />
+                <p className="text-xs" style={{ color: '#7B7B9A' }}>IG Sledující</p>
+              </div>
+              <p className="text-xl font-bold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-mono)' }}>
+                {loading ? '–' : ig?.followers?.toLocaleString('cs') ?? '–'}
+              </p>
+              <p className="text-[10px] mt-0.5" style={{ color: '#7B7B9A' }}>followers</p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              className="p-4 rounded-xl"
+              style={{ backgroundColor: '#0F0F1A', border: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar size={14} style={{ color: '#FFB800' }} />
+                <p className="text-xs" style={{ color: '#7B7B9A' }}>FB Fanoušci</p>
+              </div>
+              <p className="text-xl font-bold" style={{ color: '#F0F0FF', fontFamily: 'var(--font-mono)' }}>
+                {loading ? '–' : fb?.fans?.toLocaleString('cs') ?? '–'}
+              </p>
+              <p className="text-[10px] mt-0.5" style={{ color: '#7B7B9A' }}>fans</p>
+            </motion.div>
           </div>
-        </GlassCard>
+        </div>
       </div>
+
+      {/* Data freshness footer */}
+      {data?.fetchedAt && (
+        <p className="text-xs mt-6 text-right" style={{ color: '#7B7B9A' }}>
+          Aktualizováno: {new Date(data.fetchedAt).toLocaleTimeString('cs-CZ')}
+        </p>
+      )}
     </div>
   )
 }

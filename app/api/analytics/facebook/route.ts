@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
-import { getFacebookPageInsights, getFacebookPosts } from '@/lib/api/meta'
+import { getFacebookProfile, getFacebookPosts } from '@/lib/api/meta'
 
 export async function GET() {
   try {
-    const [insights, posts] = await Promise.allSettled([
-      getFacebookPageInsights('week'),
+    const [profile, posts] = await Promise.allSettled([
+      getFacebookProfile(),
       getFacebookPosts(10),
     ])
     return NextResponse.json({
-      insights: insights.status === 'fulfilled' ? insights.value : null,
+      profile: profile.status === 'fulfilled' ? profile.value : null,
       posts: posts.status === 'fulfilled' ? posts.value : null,
     })
   } catch (error) {
